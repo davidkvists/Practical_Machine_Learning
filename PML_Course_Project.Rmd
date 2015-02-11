@@ -1,0 +1,91 @@
+---
+title: "Practice Machine Learning"
+author: "David Kvists"
+date: "Tuesday, February 10, 2015"
+output: html_document
+---
+
+##Activity quality predicton using activity monitoring data###
+
+##Introduction##
+This project is devoted to Practical Machine Learning. In particular, we will incorporate the machine learning algorithms to predict activity quality from monitoring devices data. 
+
+##Pre-processing the data##
+
+There are two data sets: 1) training data set containing 160 columns and 19622 rows, 2) validation data set containing 160 columns and 20 rows.
+First step is to clean the data as there are a lot of "NA" and " " entries in our data set. We use the algoritm that checks if the column that represents particular variable has more that 75% incomplete measurements representing as rows and if it does- deletes the particular column.
+Also we delete the columns that contain non-numeric variables. This step is done for both -training and validation data set. After data cleaning, we have 53 variables that will be used for our prediction algorithm
+The first step of pre-processing is shown in the code below:
+
+```{r}
+#loading data
+setwd(file.path("C:","Users","David","Documents","Financial Engineering","Coursera","Practical Machine Learning"))
+##Loading necessary files
+training_df<-read.csv("train_data.csv", na.strings=c("","NA"))
+
+valid_df<-read.csv("test_data.csv", na.strings=c("","NA"))
+
+#Deletes columns where "NA" or "" encounters more that 75%
+ 
+pred_elim_vect<-rep(0,nrow(training_df))
+for (i in 1:length(colnames(training_df))){
+      if (length(which(is.na(training_df[,i])))/nrow(training_df)>=0.75 || length(which(training_df[,i]==""))/nrow(training_df)>=0.75)
+       pred_elim_vect[i]<-0
+      
+      else 
+       pred_elim_vect[i]<-1
+                
+}
+training_df<-training_df[,which(pred_elim_vect==1)]
+valid_df<-valid_df[,which(pred_elim_vect==1)]
+#eliminating also non-numerical values
+training_df<-training_df[,-(1:6),drop=FALSE]
+valid_df<-valid_df[,-(1:6),drop=FALSE]
+
+```
+
+The next step is to split training set in to two parts - training and test sets. We will use the test set obtained from the website only one time as the model validation set.
+
+```{r}
+library(caret)
+set.seed(1245)
+InTrain<-createDataPartition(y=training_df$classe, p=0.8,list=FALSE)
+training = training_df[InTrain,]
+testing = training_df[-InTrain,]
+dim(testing)
+dim(training)
+```
+
+##Selection of Machine Learning Algorithm##
+Selection of an apropriate Machine Learning Algorithm is paramount as it affects the prediction error and computational time. For the scope of this project we use "caret" package in R. The objective of this project is classified as classification problem and in this case we would like to use the algorithm that is developed solely for classification problem. The first try to solve our classification problem was using Soft independent modelling by class analogy (SIMCA) model from "caret" package.
+This model uses PCA analysis and it is relatively fast. 
+```{r}
+# Fitting the model using CSimca algorithm
+ 
+modelFit<-train(classe~.,method="CSimca",data=training)
+pred<-predict(modelFit,newdata=testing)
+confusionMatrix(pred,testing$classe)
+```
+
+The accuracy of this model was 77% suggesting that we may look for different ML algorithm that produces higher accuracy. 
+The next try was the "C5.0" model that generates the decision trees using the concept of information entropy.
+```{r,warning=FALSE}
+# Fitting the model with C5.0 algorithm
+modelFit1<-train(classe~.,method="C5.0",data=training)
+pred1<-predict(modelFit1,newdata=testing)
+confusionMatrix(pred1,testing$classe)
+
+```
+ 
+As we can this model gives us 99.9% prediction accuracy. The downside is that C5.0 algorithm is very computationally time consuming.
+The final step is to validate our model on small out-of-the-sample validation test
+```{r}
+#Validating the model on out-of-the-sample validation dataset
+pred_validation<-predict(modelFit1,newdata=valid_df)
+
+pred_vect<-as.character(pred_validation)
+pred_vect
+```
+
+###Summary###
+In this project we have used C5.0 classification algorithm to predict activity quality level. After using cross-validation, our in-sample error was very small approx. 0.01%. The model also was very accurate (100%) predicting out-of-the-sample activity quality levels.
